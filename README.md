@@ -1,123 +1,66 @@
-# European Gas Storage Monitor
+**European Gas Balance — Storage Monitor & Spread View**
 
-A daily-updating analytical model of European natural gas storage, built to read the
-physical fundamental that sits underneath the TTF forward curve.
+A daily model of European gas fundamentals that turns storage tightness into a falsifiable view on the TTF summer–winter spread.
 
----
+**Thesis:** Storage level, pace, and position vs the seasonal norm are fundamental to the European gas market, this notebook quantifies the storage side, models the two biggest suppliers (Norwegian pipe, LNG send-out), and closes with a view on the TTF summer–winter spread.
 
-## Why storage
+Built in Python (Colab). Storage systems covered: Germany, France, Italy, Netherlands, Austria — together ≈73% of EU working gas volume.
 
-European gas storage is the most-watched physical fundamental in the TTF complex. The
-seasonal storage cycle — inject in summer when demand is low, withdraw in winter when
-heating demand peaks — is the reason the forward curve carries its seasonal shape, and the
-summer–winter spread is the traded expression of storage economics. The no-arbitrage
-condition for injecting in summer is, roughly:
+**What it produces**
 
-> winter price − summer price ≥ storage cost + financing cost of the gas held
+The output is a computed desk note, not hand-written. Example run (2026-06-30 data):
 
-When that spread is wider than carry, injection is economic and storage fills; when it is
-narrow or negative, injection lags. So storage level, the *pace* of injection/withdrawal,
-and where both sit relative to the seasonal norm are the first things a power & gas desk
-checks — and the gap between what storage *implies* and what the market has *priced* is
-where trade ideas live.
+EVIDENCE  (as of 2026-06-30; anomalies = 4wk mean vs 2023+ norm, GWh/d)
+  storage    : 48.0% full, -98 TWh vs norm; flow -115 (below-normal injection)
+  end-season : ~84% by 1 Nov on current gap (-6 pts vs 90% target)
+  supply     : Norway +102 | LNG -20
+  demand res : +197 (above norm; tracks HDD, r = -0.79)
+  curve      : summer-winter -1.29 EUR/MWh vs ~2.5 carry (2026-07-02)
 
-This model quantifies the first half of that sentence: **is European storage tight, loose,
-or normal right now, and is the trajectory taking it somewhere the market should care
-about?** It is the fundamentals-literate baseline that a price-vs-fundamentals view is
-built on.
+DESK NOTE
+  * EU-5 48% full, -98 TWh vs norm -> ~84% end-season (short of the 90% target).
+  * Mix: firm demand only partially offset by firm Norwegian flows.
+  * Curve: -1.29 vs ~2.5 carry -> summer over winter — no tightness priced; AT ODDS with fundamentals.
+  * Skew: one-sided — firm demand persists OR the offset (firm Norwegian flows) fades into winter; either slips fill below ~84% -> spread biased wider.
 
----
+Read top to bottom, the balance is running ~100 TWh tight versus the seasonal norm and tracking short of the 90% target, the curve is pricing no tightness at all, and the risk is one-sided. The note regenerates on every run, so it reads correctly whatever the market is doing, not just this snapshot.
 
-## What it does
+**How it's built**
 
-Pulling daily storage data from the GIE AGSI+ transparency platform (2017–present), the
-model produces, for five core EU storage countries and a capacity-weighted EU aggregate:
+1 · Data layer — every source pulled, cleaned, cached (refreshed once daily), and coverage-verified, then merged onto one daily frame:
 
-- **Seasonal positioning** — current storage benchmarked against a trailing 5-year
-  seasonal band, with deviation from the median and a percentile rank for the calendar day
-  (the "tight or loose, in one number" read).
-- **Flow & momentum** — net injection/withdrawal pace, measured both as a ratio to the
-  seasonal norm and as a standardised z-score that stays robust at season turns.
-- **Resilience** — days-of-cover against a high-percentile historical winter draw, so the
-  metric answers "how long would stock last in a real cold snap," not "in today's summer."
-- **Trajectory** — a forward projection of the refill against each country's national fill
-  target, framed as required-pace-vs-current-pace rather than a point forecast.
-- **An EU tightness index** — the aggregate deviation expressed in standard deviations of
-  the seasonal norm, a single number comparable across regimes (e.g. today vs the 2022
-  crisis).
-- **A generated storage brief** per country — plain-language narration of all of the above
-  that reads like a desk analyst's morning note.
+Storage — GIE AGSI+ (per-country stock, injection/withdrawal, working gas volume)
+Norwegian pipeline supply — ENTSOG via eurogastp (metered North Sea entry points)
+LNG send-out — GIE ALSI (NW-European regas terminals feeding the EU-5 grid)
+Weather — Open-Meteo (heating/cooling degree days, gas-demand-weighted to one EU series)
+Price — TTF front-month (Yahoo TTF=F)
 
-Output is structured for two uses: an EU roll-up and scan as a daily morning read, and
-per-country drill-downs (fan chart + projection + brief) when something in the scan flags
-attention.
+2 · Storage monitor — each country is benchmarked against its own five-year history: seasonal fan charts, a percentile-and-tightness read, pace scoring, days-of-cover, and per-country projections to national fill targets.
 
----
+3 · Storage ↔ price — shows why the storage tightness is more applicable to the spread, not the outright price: the storage–front-month link was strong pre-2022, broke in the crisis, and has been weak-to-negative since. Scarcity is priced in the shape of the curve.
 
-## Design decisions that matter
+4 · Market Implications — the evidence block and desk note above.
 
-The analytical choices are the point of the project, not the plumbing. The notable ones:
+**Design choices worth reading**
 
-- **Median, not mean, as the seasonal benchmark.** The 2022–24 energy crisis force-filled
-  storage toward 90%+, inflating the *upper half* of any reference distribution. The median
-  and minimum are robust to that contamination; the mean and maximum are not. The model
-  reads off the robust statistics and documents the bias rather than hiding it.
-- **Windowed pooling for the seasonal band.** Statistics for each calendar day are pooled
-  from a ±7-day window across the reference years (~75 observations), not the 5 values on
-  that exact day — enough sample for stable quantiles.
-- **A robust pace measure.** A simple pace ratio explodes near season turns, where the
-  seasonal-norm denominator approaches zero. The model carries a standardised z-score
-  (pace minus norm, in standard deviations of the period) that stays meaningful year-round,
-  and guards the ratio against the near-zero blow-up.
-- **Capacity-weighted aggregation.** The EU figure is built by summing absolute volumes and
-  dividing — never by averaging the five countries' percentages, which would let a small
-  country distort the aggregate.
-- **Per-country self-calibration.** Each country is measured against *its own* history, so
-  one engine serves five structurally different storage systems (large seasonal stores,
-  fast-cycle Dutch storage, export-linked Austrian capacity) without hand-tuned thresholds.
+- Norway and LNG are modelled because they are the biggest contributors and the swing legs where short-term supply variance is most applicable. Unmodelled legs (Algerian/Azeri pipe into IT, TurkStream, UK interconnectors, trade with the rest-of-EU 27%) largely sit inside the norm and cancel; off-pattern behaviour lands in the residual as minor terms alongside demand.
+- Median-and-MAD benchmarking, notebook-wide. The seasonal norms read off the median with a robust (MAD) scale to avoid the 2022–24 crisis inflating the distribution and flattening real signals.
+- Windowed pooling (±7 days, wrapping the year boundary) for stable seasonal quantiles from thin daily history.
+- Capacity-normalised levels, so fullness compares across capacity eras rather than raw TWh.
+- Coverage guards on every aggregate — partial-reporting days are masked, not silently summed to a false low, on both the LNG panel and the weather series.
+- Deviation-carry projection. End-season fill is projected by carrying today's gap-to-norm forward to the November peak, rather than extrapolating a noisy 30-day pace across four months.
 
-## Scope and limitations
+**Scope and limitations**
 
-Stated deliberately — knowing what the model does *not* do is part of using it honestly.
+- Seasonal-spread strip prices are entered manually (no open historical feed exists); the storage→spread link is carried by cost-of-carry logic, not a fitted coefficient. A staleness guard warns if the manual print lags the storage data.
+- The demand residual carries off-pattern unmodelled flows as minor terms; the HDD validation is in winter observations, so summer residual anomalies read as power burn / industry rather than heating.
+- TTF TTF=F is a proxy series, adequate for the §3 motivation charts only.
 
-- **Five countries (DE, FR, IT, NL, AT).** These hold roughly two-thirds of EU storage
-  capacity. The UK is excluded: its AGSI+ reporting stopped in late 2020, which reflects
-  the underlying reality — post-Rough-closure Britain holds minimal seasonal storage and
-  runs on continuous LNG and Norwegian imports, making it an import-flow question, not a
-  storage one.
-- **Storage only.** This is the fundamentals baseline. The price layer (TTF curve,
-  summer–winter spread, storage-vs-spread) is the planned next phase; clean TTF settlement
-  data is the gating constraint.
-- **The projection is a scenario, not a forecast.** It extrapolates a defined pace over the
-  season; it carries no confidence interval and no account of why a given year might differ.
-  A proper statistical forecast (SARIMA, with intervals) is a planned econometric extension.
-- **The reference band includes the crisis years by design** (2021–2025), since pre-2022
-  storage behaviour reflects Russian pipeline supply that no longer exists and is therefore
-  structurally obsolete rather than a cleaner baseline. The model manages the resulting bias
-  via robust statistics rather than excluding the data.
 
----
 
-## Roadmap
+**Running it**
 
-1. **Price layer** — TTF front-month and the summer–winter spread overlaid on storage;
-   the storage-deviation-vs-spread relationship through a cost-of-carry lens.
-2. **Supply-side feeds** — LNG send-out (GIE ALSI), Norwegian pipeline flows, weather /
-   heating-degree-days as a demand proxy.
-3. **Econometric layer** — SARIMA forecasting with intervals; cointegration testing of the
-   storage–spread and cross-country relationships.
-
----
-
-## Running it
-
-1. Register for a free AGSI+ API key at the GIE transparency platform.
-2. Add it as a Colab secret named `AGSI_KEY` (or set it as an environment variable if
-   running locally).
-3. Run the notebook top to bottom. The data pull caches to CSV; subsequent runs read the
-   cache.
-
-Requirements: `pandas`, `requests`, `matplotlib`. Data: GIE AGSI+ (free registration).
+Colab, top to bottom. Requires a free GIE API key added as the Colab secret AGSI_KEY (one key covers both AGSI+ storage and ALSI LNG).
 
 ---
 
