@@ -1,6 +1,21 @@
-eu_storage.csv
+# --- Data caches: regenerated from source APIs on run (require a GIE key) ---
+# Ignore all CSVs by default, then keep the one handoff file so the §4 view
+# reproduces without a key.
 *.csv
+!daily_foundation.csv
+
+# --- Secrets: never commit (the notebook reads the GIE key from Colab secrets) ---
+.env
+*.env
+secrets.*
+*_key.txt
+kaggle.json
+
+# --- Notebook / Python cruft ---
 .ipynb_checkpoints/
 __pycache__/
-.env
-*.key
+*.pyc
+
+# --- OS ---
+.DS_Store
+Thumbs.db
